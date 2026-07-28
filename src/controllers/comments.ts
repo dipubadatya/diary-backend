@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import Story from '../models/story';
 import Comment from '../models/comment';
 
+
 export const createComment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { storyId } = req.params;
@@ -72,6 +73,7 @@ export const createComment = async (req: Request, res: Response, next: NextFunct
     next(error);
   }
 };
+
 
 export const deleteComment = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {

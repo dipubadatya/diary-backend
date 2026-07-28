@@ -1,8 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import { OAuth2Client } from 'google-auth-library';
 import User from '../models/user';
 import { sendVerificationEmail, sendResetPasswordEmail, sendPasswordConfirmationEmail } from '../services/mail';
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const cookieOptions = {
   httpOnly: true,
@@ -16,29 +19,29 @@ export const signup = async (req: Request, res: Response, _next: NextFunction): 
     const { name, username, email, password } = req.body;
 
     if (!name || !username || !email || !password) {
-       res.status(400).json({ error: 'All fields are required.' });
-       return;
+      res.status(400).json({ error: 'All fields are required.' });
+      return;
     }
 
     // Check for existing unverified user
     const unverifiedUser = await User.findOne({ email, isVerified: false });
     if (unverifiedUser) {
-       res.status(400).json({ error: 'Email registered but not verified. Check your email or request another link.' });
-       return;
+      res.status(400).json({ error: 'Email registered but not verified. Check your email or request another link.' });
+      return;
     }
 
     // Check for existing verified user
     const verifiedUser = await User.findOne({ email, isVerified: true });
     if (verifiedUser) {
-       res.status(400).json({ error: 'This email is already registered and verified.' });
-       return;
+      res.status(400).json({ error: 'This email is already registered and verified.' });
+      return;
     }
 
     // Check for existing username
     const existingUsername = await User.findOne({ username });
     if (existingUsername) {
-       res.status(400).json({ error: 'A user with the given username is already registered.' });
-       return;
+      res.status(400).json({ error: 'A user with the given username is already registered.' });
+      return;
     }
 
     const verificationToken = crypto.randomBytes(20).toString('hex');
@@ -91,8 +94,8 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
     const { token } = req.query;
 
     if (!token || typeof token !== 'string') {
-       res.status(400).json({ error: 'No verification token provided.' });
-       return;
+      res.status(400).json({ error: 'No verification token provided.' });
+      return;
     }
 
     const user = await User.findOne({
@@ -101,13 +104,13 @@ export const verifyEmail = async (req: Request, res: Response, next: NextFunctio
     });
 
     if (!user) {
-       res.status(400).json({ error: 'Verification token is invalid or has expired. Please register again.' });
-       return;
+      res.status(400).json({ error: 'Verification token is invalid or has expired. Please register again.' });
+      return;
     }
 
     if (user.isVerified) {
-       res.status(200).json({ success: true, message: 'This email is already verified. Please log in.' });
-       return;
+      res.status(200).json({ success: true, message: 'This email is already verified. Please log in.' });
+      return;
     }
 
     user.isVerified = true;
@@ -129,20 +132,20 @@ export const resendVerification = async (req: Request, res: Response, next: Next
     const { email } = req.body;
 
     if (!email) {
-       res.status(400).json({ error: 'Email is required.' });
-       return;
+      res.status(400).json({ error: 'Email is required.' });
+      return;
     }
 
     const user = await User.findOne({ email });
 
     if (!user) {
-       res.status(404).json({ error: 'No account found with this email.' });
-       return;
+      res.status(404).json({ error: 'No account found with this email.' });
+      return;
     }
 
     if (user.isVerified) {
-       res.status(400).json({ error: 'This email is already verified. Please log in.' });
-       return;
+      res.status(400).json({ error: 'This email is already verified. Please log in.' });
+      return;
     }
 
     const verificationToken = crypto.randomBytes(20).toString('hex');
@@ -279,7 +282,7 @@ export const checkAuth = async (req: Request, res: Response): Promise<void> => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'DIARY_APP_SECRET') as { userId: string };
-    
+
     if (!decoded || !decoded.userId) {
       res.status(401).json({ isAuthenticated: false, error: 'Not authenticated.' });
       return;
@@ -316,14 +319,14 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
     const { email } = req.body;
 
     if (!email) {
-       res.status(400).json({ error: 'Email is required.' });
-       return;
+      res.status(400).json({ error: 'Email is required.' });
+      return;
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-       res.status(404).json({ error: 'We couldn’t find an account with that email address.' });
-       return;
+      res.status(404).json({ error: 'We couldn’t find an account with that email address.' });
+      return;
     }
 
     const resetToken = crypto.randomBytes(20).toString('hex');
@@ -350,18 +353,18 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     const { token } = req.params;
 
     if (!password || !confirmPassword) {
-       res.status(400).json({ error: 'Please fill in all fields.' });
-       return;
+      res.status(400).json({ error: 'Please fill in all fields.' });
+      return;
     }
 
     if (password.length < 6) {
-       res.status(400).json({ error: 'Password must be at least 6 characters.' });
-       return;
+      res.status(400).json({ error: 'Password must be at least 6 characters.' });
+      return;
     }
 
     if (password !== confirmPassword) {
-       res.status(400).json({ error: 'Passwords do not match.' });
-       return;
+      res.status(400).json({ error: 'Passwords do not match.' });
+      return;
     }
 
     const user = await User.findOne({
@@ -370,8 +373,8 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     });
 
     if (!user) {
-       res.status(400).json({ error: 'Your password reset link has expired or is invalid. Please request a new one.' });
-       return;
+      res.status(400).json({ error: 'Your password reset link has expired or is invalid. Please request a new one.' });
+      return;
     }
 
     user.password = password; // pre-save hook will hash it automatically
@@ -391,5 +394,112 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     });
   } catch (error) {
     next(error);
+  }
+};
+
+export const googleLogin = async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      res.status(400).json({ error: 'Google ID Token is required.' });
+      return;
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+
+    if (!payload || !payload.email) {
+      res.status(400).json({ error: 'Google verification failed.' });
+      return;
+    }
+
+    const email = payload.email.toLowerCase();
+    const googleId = payload.sub;
+    const name = payload.name || email.split('@')[0];
+    const picture = payload.picture;
+
+    let user = await User.findOne({ email });
+
+    if (user) {
+      let updateNeeded = false;
+      if (!user.isVerified) {
+        user.isVerified = true;
+        user.verificationToken = undefined;
+        user.verificationTokenExpires = undefined;
+        updateNeeded = true;
+      }
+      
+      if (!user.googleId) {
+        user.googleId = googleId;
+        updateNeeded = true;
+      }
+      if (!user.provider) {
+        user.provider = 'google';
+        updateNeeded = true;
+      }
+
+      if (updateNeeded) {
+        await user.save();
+      }
+    } else {
+      let baseUsername = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '');
+      if (baseUsername.length < 3) {
+        baseUsername = 'user_' + baseUsername;
+      }
+      
+      let username = baseUsername;
+      let count = 0;
+      while (await User.findOne({ username })) {
+        count++;
+        username = `${baseUsername}${count}`;
+      }
+
+      user = new User({
+        name,
+        username,
+        email,
+        provider: 'google',
+        googleId,
+        avatar: picture,
+        emailVerified: true,
+        isVerified: true,
+        image: picture ? { url: picture, filename: 'google_profile' } : undefined
+      });
+
+      await user.save();
+    }
+
+    const token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_SECRET || 'DIARY_APP_SECRET',
+      { expiresIn: '7d' }
+    );
+
+    res.cookie('token', token, cookieOptions);
+
+    res.status(200).json({
+      success: true,
+      message: 'Login successful!',
+      user: {
+        _id: user._id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        image: user.image,
+        banner: user.banner,
+        bio: user.bio,
+        followersCount: user.followers.length,
+        followingCount: user.following.length,
+        storiesCount: user.stories.length
+      }
+    });
+  } catch (error: any) {
+    console.error('Google Auth Error:', error);
+    res.status(400).json({ error: error.message || 'Google authentication failed.' });
   }
 };

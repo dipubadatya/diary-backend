@@ -7,7 +7,8 @@ import {
   logout,
   checkAuth,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  googleLogin
 } from '../controllers/auth';
 
 const router = Router();
@@ -16,6 +17,7 @@ router.post('/signup', signup);
 router.get('/verify-email', verifyEmail);
 router.post('/resend-verification', resendVerification);
 router.post('/login', login);
+router.post('/google', googleLogin);
 router.get('/logout', logout); // Supports GET for ease of use (like original EJS app)
 router.post('/logout', logout); // Also supports POST for standard SPA best practices
 router.get('/check', checkAuth);

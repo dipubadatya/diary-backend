@@ -15,6 +15,10 @@ export interface IUser extends Document {
   username: string;
   email: string;
   password?: string;
+  provider?: string;
+  googleId?: string;
+  avatar?: string;
+  emailVerified?: boolean;
   comparePassword(candidatePassword: string): Promise<boolean>;
   image: {
     url: string;
@@ -78,7 +82,23 @@ const userSchema = new Schema<IUser>({
   },
   password: {
     type: String,
-    required: true
+    required: function(this: any) {
+      return !this.provider || this.provider === 'local';
+    }
+  },
+  provider: {
+    type: String,
+    default: 'local'
+  },
+  googleId: {
+    type: String
+  },
+  avatar: {
+    type: String
+  },
+  emailVerified: {
+    type: Boolean,
+    default: false
   },
   image: {
     url: {
@@ -138,7 +158,7 @@ const userSchema = new Schema<IUser>({
 
 // Pre-save hook to check for duplicate email and hash password
 userSchema.pre('save', async function (next) {
-  if (this.isModified('password')) {
+  if (this.isModified('password') && this.password) {
     try {
       const salt = await bcrypt.genSalt(10);
       this.password = await bcrypt.hash(this.password as string, salt);
