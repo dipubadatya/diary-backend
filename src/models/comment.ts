@@ -5,6 +5,10 @@ export interface IComment extends Document {
   gif?: string;
   author: mongoose.Types.ObjectId;
   timeStamp: Date;
+  parentId?: mongoose.Types.ObjectId | null;
+  likes: mongoose.Types.ObjectId[];
+  likesCount: number;
+  editedAt?: Date;
 }
 
 const commentSchema = new Schema<IComment>({
@@ -23,6 +27,22 @@ const commentSchema = new Schema<IComment>({
   timeStamp: {
     type: Date,
     default: Date.now
+  },
+  parentId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Comment',
+    default: null
+  },
+  likes: [{
+    type: Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  likesCount: {
+    type: Number,
+    default: 0
+  },
+  editedAt: {
+    type: Date
   }
 });
 

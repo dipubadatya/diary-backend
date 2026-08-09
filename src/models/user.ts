@@ -10,6 +10,7 @@ export interface INotification {
   read: boolean;
 }
 
+
 export interface IUser extends Document {
   name: string;
   username: string;
