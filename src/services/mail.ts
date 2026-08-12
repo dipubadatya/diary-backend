@@ -1,258 +1,371 @@
 import nodemailer from 'nodemailer';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TRANSPORTER
+// ─────────────────────────────────────────────────────────────────────────────
+
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
+    pass: process.env.EMAIL_PASS,
+  },
 });
 
-export const sendVerificationEmail = async (email: string, username: string, token: string, host: string, protocol: string): Promise<void> => {
-  // Use frontend URL if configured, otherwise fallback to request headers
-  const clientUrl = process.env.CLIENT_URL || `${protocol}://${host}`;
-  const verificationUrl = `${clientUrl}/verify-email?token=${token}`;
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const mailOptions = {
+const YEAR = new Date().getFullYear();
+const FROM = `"Diary" <${process.env.EMAIL_USER}>`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STYLES
+// Defined once, injected into every template via <style> tag.
+// Note: Gmail clips <style> blocks — critical styles are also inlined per element.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const styles = `
+  /* ── Reset ── */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #F9F9F6;
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ── */
+  .wrapper {
+    max-width: 540px;
+    margin: 0 auto;
+    padding: 56px 20px;
+  }
+
+  /* ── Logo ── */
+  .logo-area {
+    display: flex;
+    align-items: center;
+    margin-bottom: 40px;
+  }
+  .logo-icon {
+    width: 26px;
+    height: 26px;
+    background-color: #1A1C23;
+    border-radius: 7px;
+    display: inline-block;
+    margin-right: 10px;
+    flex-shrink: 0;
+  }
+  .logo-text {
+    font-size: 20px;
+    font-weight: 800;
+    color: #1A1C23;
+    letter-spacing: -0.4px;
+  }
+
+  /* ── Header ── */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #78716C;
+    margin-bottom: 10px;
+  }
+  .page-title {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #1A1C23;
+    margin: 0 0 28px 0;
+    line-height: 1.1;
+    letter-spacing: -0.5px;
+  }
+
+  /* ── Card ── */
+  .card {
+    background-color: #FFFFFF;
+    border-radius: 14px;
+    padding: 36px 40px 40px;
+    border: 1px solid #E7E5E4;
+    box-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.04),
+      0 4px 12px rgba(0, 0, 0, 0.03);
+  }
+
+  /* ── Typography ── */
+  .greeting {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1A1C23;
+    margin: 0 0 16px 0;
+  }
+  .body-text {
+    font-size: 15px;
+    line-height: 1.7;
+    color: #44403C;
+    margin: 0 0 24px 0;
+  }
+  .small-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: #57534E;
+    margin: 16px 0 0 0;
+  }
+
+  /* ── Button ── */
+  .btn {
+    display: inline-block;
+    background-color: #C6F547;
+    color: #1A1C23 !important;
+    font-weight: 700;
+    font-size: 14px;
+    text-decoration: none;
+    padding: 13px 26px;
+    border-radius: 9px;
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    border: none;
+    border-top: 1px solid #F0EEEA;
+    margin: 28px 0 0 0;
+  }
+
+  /* ── Fallback URL block ── */
+  .fallback-wrap {
+    padding-top: 20px;
+  }
+  .fallback-label {
+    font-size: 12px;
+    color: #78716C;
+    margin: 0 0 8px 0;
+    line-height: 1.5;
+  }
+  .fallback-url {
+    display: block;
+    background-color: #F9F9F6;
+    border-radius: 7px;
+    padding: 12px 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11px;
+    color: #57534E;
+    word-break: break-all;
+    line-height: 1.6;
+    text-decoration: none;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 28px;
+    font-size: 12px;
+    color: #A8A29E;
+    line-height: 1.6;
+  }
+  .footer a {
+    color: #78716C;
+    text-decoration: underline;
+  }
+`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LAYOUT BUILDER
+// Wraps every template with the shared chrome: doctype, head, logo, title, footer.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const buildLayout = ({
+  eyebrow,
+  title,
+  card,
+}: {
+  eyebrow: string;
+  title: string;        // supports <br/> for line breaks
+  card: string;
+}) => `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+  <meta name="x-apple-disable-message-reformatting"/>
+  <meta name="format-detection" content="telephone=no,date=no,address=no,email=no,url=no"/>
+  <title>Diary</title>
+  <style>${styles}</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Logo -->
+  <div class="logo-area">
+    <div class="logo-icon"></div>
+    <span class="logo-text">Diary</span>
+  </div>
+
+  <!-- Page header -->
+  <p class="eyebrow">${eyebrow}</p>
+  <h1 class="page-title">${title}</h1>
+
+  <!-- Card -->
+  <div class="card">
+    ${card}
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    &copy; ${YEAR} Diary. All rights reserved.<br/>
+  </div>
+
+</div>
+</body>
+</html>
+`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CARD COMPONENTS
+// Small HTML snippets composed inside each card body.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Personalised salutation */
+const Greeting = (name: string) =>
+  `<p class="greeting">Hi ${name},</p>`;
+
+/** Standard body paragraph */
+const BodyText = (text: string) =>
+  `<p class="body-text">${text}</p>`;
+
+/** Smaller muted note paragraph */
+const SmallText = (text: string) =>
+  `<p class="small-text">${text}</p>`;
+
+/** Primary lime CTA button */
+const Button = (label: string, url: string) =>
+  `<a href="${url}" class="btn">${label}</a>`;
+
+/** Horizontal rule */
+const Divider = () =>
+  `<hr class="divider"/>`;
+
+/** Monospace URL fallback block shown below every action button */
+const FallbackUrl = (url: string, label = "If the button doesn't work, copy and paste this link into your browser:") => `
+  ${Divider()}
+  <div class="fallback-wrap">
+    <p class="fallback-label">${label}</p>
+    <a href="${url}" class="fallback-url">${url}</a>
+  </div>
+`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER — resolve base client URL
+// ─────────────────────────────────────────────────────────────────────────────
+
+const clientUrl = (host: string, protocol: string) =>
+  process.env.CLIENT_URL || `${protocol}://${host}`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL 1 — VERIFY EMAIL
+// Sent immediately after account registration.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const sendVerificationEmail = async (
+  email: string,
+  username: string,
+  token: string,
+  host: string,
+  protocol: string,
+): Promise<void> => {
+  const url = `${clientUrl(host, protocol)}/verify-email?token=${token}`;
+
+  const card = `
+    ${Greeting(username)}
+    ${BodyText("We're glad you're here. Before you can start writing and sharing your stories, we just need to verify your email address to keep your account secure.")}
+    ${Button('Verify email address', url)}
+    ${FallbackUrl(url)}
+  `;
+
+  await transporter.sendMail({
     to: email,
-    from: `"DIARY-WEB-APP" <${process.env.EMAIL_USER}>`,
-    subject: '🔐 Verify Your Email for Diary',
-    html: `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body {
-          font-family: 'Inter', sans-serif;
-          background-color: #f8fafc;
-          margin: 0;
-          padding: 0;
-        }
-        .container {
-          max-width: 600px;
-          margin: 20px auto;
-          background: white;
-          border-radius: 12px;
-          overflow: hidden;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-        }
-        .header {
-          background: linear-gradient(135deg, #4f46e5, #06b6d4);
-          padding: 30px;
-          text-align: center;
-          color: white;
-        }
-        .header h1 {
-          margin: 0;
-          font-size: 24px;
-          font-weight: 700;
-        }
-        .content {
-          padding: 40px 30px;
-          color: #334155;
-          line-height: 1.6;
-        }
-        .button-container {
-          text-align: center;
-          margin: 30px 0;
-        }
-        .btn {
-          display: inline-block;
-          padding: 12px 24px;
-          background-color: #4f46e5;
-          color: white !important;
-          text-decoration: none;
-          font-weight: 600;
-          border-radius: 6px;
-          box-shadow: 0 4px 6px -1px rgba(79, 70, 229, 0.2);
-        }
-        .url-box {
-          background-color: #f1f5f9;
-          padding: 15px;
-          border-radius: 6px;
-          word-break: break-all;
-          font-family: monospace;
-          font-size: 14px;
-          color: #64748b;
-        }
-        .footer {
-          background-color: #f8fafc;
-          padding: 20px;
-          text-align: center;
-          font-size: 12px;
-          color: #94a3b8;
-          border-top: 1px solid #e2e8f0;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Verify Your Email</h1>
-        </div>
-        <div class="content">
-          <p>Hi <strong>${username}</strong>,</p>
-          <p>Welcome to Diary! We are excited to have you join our community of storytellers. Please verify your email address to active your account.</p>
-          <div class="button-container">
-            <a href="${verificationUrl}" class="btn">Verify Account</a>
-          </div>
-          <p>If the button doesn't work, copy and paste the following link in your browser:</p>
-          <div class="url-box">
-            ${verificationUrl}
-          </div>
-          <p>This verification link will expire in 24 hours.</p>
-        </div>
-        <div class="footer">
-          © ${new Date().getFullYear()} Diary. All rights reserved.
-        </div>
-      </div>
-    </body>
-    </html>
-    `
-  };
-
-  await transporter.sendMail(mailOptions);
+    from: FROM,
+    subject: 'Verify your email for Diary',
+    html: buildLayout({
+      eyebrow: 'Account Setup',
+      title: 'Welcome to<br/>Diary',
+      card,
+    }),
+  });
 };
 
-export const sendResetPasswordEmail = async (email: string, username: string, token: string, host: string, protocol: string): Promise<void> => {
-  const clientUrl = process.env.CLIENT_URL || `${protocol}://${host}`;
-  const resetUrl = `${clientUrl}/reset-password/${token}`;
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL 2 — RESET PASSWORD
+// Sent when a user requests a password reset.
+// Link expires after 30 minutes (enforced server-side).
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const mailOptions = {
+export const sendResetPasswordEmail = async (
+  email: string,
+  username: string,
+  token: string,
+  host: string,
+  protocol: string,
+): Promise<void> => {
+  const url = `${clientUrl(host, protocol)}/reset-password/${token}`;
+
+  const card = `
+    ${Greeting(username)}
+    ${BodyText("We received a request to reset the password for your Diary account. If you made this request, click the button below to set a new one. This link will expire in <strong>30 minutes</strong>.")}
+    ${Button('Set new password', url)}
+    ${SmallText("If you didn't request this, you can safely ignore this email. Your password will remain exactly the same.")}
+    ${FallbackUrl(url, "If the button doesn't work, copy and paste this link:")}
+  `;
+
+  await transporter.sendMail({
     to: email,
-    from: `"DIARY-WEB-APP" <${process.env.EMAIL_USER}>`,
-    subject: '✍️ Reset your Diary password',
-    html: `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700&family=Open+Sans:wght@400;600&display=swap');
-        body { font-family: 'Open Sans', sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 0; }
-        .container { padding: 30px; }
-        .header { text-align: center; margin-bottom: 25px; }
-        .logo { 
-          font-family: 'Merriweather', serif;
-          font-size: 28px; 
-          font-weight: 700; 
-          color: #2d3748; 
-          margin-bottom: 5px;
-        }
-        .tagline {
-          color: #718096;
-          font-style: italic;
-          margin-bottom: 20px;
-        }
-        .divider {
-          height: 3px;
-          background: linear-gradient(90deg, #f6ad55, #f687b3, #805ad5);
-          margin: 25px 0;
-          border-radius: 3px;
-        }
-        .button { 
-          display: inline-block; 
-          background: linear-gradient(135deg, #805ad5, #d53f8c); 
-          color: white !important; 
-          padding: 14px 28px; 
-          text-decoration: none; 
-          border-radius: 8px; 
-          font-weight: 600; 
-          margin: 25px 0;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .url-container {
-          background-color: #f8fafc;
-          border-left: 4px solid #805ad5;
-          padding: 15px;
-          border-radius: 0 4px 4px 0;
-          margin: 20px 0;
-        }
-        .url {
-          word-break: break-all;
-          font-family: monospace;
-          color: #4a5568;
-        }
-        .footer { 
-          margin-top: 40px; 
-          padding-top: 20px; 
-          border-top: 1px solid #edf2f7; 
-          font-size: 13px; 
-          color: #718096; 
-          text-align: center;
-        }
-        .username {
-          font-weight: 600;
-          color: #2d3748;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <div class="logo">Diary</div>
-          <div class="tagline">Where your stories come to life</div>
-          <div class="divider"></div>
-        </div>
-
-        <p>Hi <span class="username">${username}</span>,</p>
-        
-        <p>We received a request to reset your Diary password. Don't worry - every great story needs the right key to continue!</p>
-        
-        <div style="text-align: center;">
-          <a href="${resetUrl}" class="button">Continue Your Story →</a>
-        </div>
-        
-        <p>If the button doesn't work, copy and paste this link into your browser:</p>
-        
-        <div class="url-container">
-          <code class="url">${resetUrl}</code>
-        </div>
-        
-        <p><strong>Note:</strong> This link will expire in 1 hour for your security.</p>
-        <p>If you didn't request this, you can safely ignore this email - your story remains unchanged.</p>
-        
-        <div class="footer">
-          <p>© ${new Date().getFullYear()} Diary. All rights reserved.</p>
-        </div>
-      </div>
-    </body>
-    </html>
-    `
-  };
-
-  await transporter.sendMail(mailOptions);
+    from: FROM,
+    subject: 'Reset your Diary password',
+    html: buildLayout({
+      eyebrow: 'Security',
+      title: 'Reset your<br/>password',
+      card,
+    }),
+  });
 };
 
-export const sendPasswordConfirmationEmail = async (email: string, username: string): Promise<void> => {
-  const mailOptions = {
-    to: email,
-    from: `"DIARY-WEB-APP" <${process.env.EMAIL_USER}>`,
-    subject: 'Your Diary password has been updated',
-    html: `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: #10b981; color: white; padding: 15px; text-align: center; border-radius: 6px 6px 0 0; }
-        .content { border: 1px solid #e5e7eb; border-top: none; padding: 20px; border-radius: 0 0 6px 6px; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <h2>Password Updated Successfully</h2>
-      </div>
-      <div class="content">
-        <p>Hi <strong>${username}</strong>,</p>
-        <p>This is a confirmation that the password for your Diary account has been successfully updated.</p>
-        <p>If you did not perform this action, please contact our support team immediately.</p>
-        <p>Happy writing!</p>
-      </div>
-    </body>
-    </html>
-    `
-  };
+// ─────────────────────────────────────────────────────────────────────────────
+// EMAIL 3 — PASSWORD UPDATED CONFIRMATION
+// Sent after a successful password change as a security receipt.
+// ─────────────────────────────────────────────────────────────────────────────
 
-  await transporter.sendMail(mailOptions);
+export const sendPasswordConfirmationEmail = async (
+  email: string,
+  username: string,
+  host: string,
+  protocol: string,
+): Promise<void> => {
+  const url = `${clientUrl(host, protocol)}/login`;
+
+  const card = `
+    ${Greeting(username)}
+    ${BodyText("Your password has been successfully updated. You can now use your new password to sign in to your Diary account and get back to writing.")}
+    ${Button('Go to sign in', url)}
+    ${Divider()}
+    <div class="fallback-wrap">
+      <p class="fallback-label" style="margin-bottom:0;">
+        If you did not perform this action, please <a href="mailto:${process.env.EMAIL_USER}" style="color:#57534E;">contact us immediately</a> to secure your account.
+      </p>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    to: email,
+    from: FROM,
+    subject: 'Your Diary password was updated',
+    html: buildLayout({
+      eyebrow: 'Security Update',
+      title: 'Password<br/>updated',
+      card,
+    }),
+  });
 };
