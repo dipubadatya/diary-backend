@@ -383,7 +383,9 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     await user.save();
 
     try {
-      await sendPasswordConfirmationEmail(user.email, user.username);
+      const host = req.headers.host || 'localhost:3000';
+      const protocol = req.protocol || 'http';
+      await sendPasswordConfirmationEmail(user.email, user.username, host, protocol);
     } catch (mailErr) {
       console.error('Failed to send password reset confirmation email:', mailErr);
     }

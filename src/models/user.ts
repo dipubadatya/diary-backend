@@ -35,6 +35,7 @@ export interface IUser extends Document {
   stories: mongoose.Types.ObjectId[];
   followers: mongoose.Types.ObjectId[];
   following: mongoose.Types.ObjectId[];
+  recentSearches: mongoose.Types.ObjectId[];
   isOnline: boolean;
   lastSeen: Date;
   notifications: INotification[];
@@ -139,6 +140,10 @@ const userSchema = new Schema<IUser>({
     ref: "User"
   }],
   following: [{
+    type: Schema.Types.ObjectId,
+    ref: "User"
+  }],
+  recentSearches: [{
     type: Schema.Types.ObjectId,
     ref: "User"
   }],
