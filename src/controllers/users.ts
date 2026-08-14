@@ -1616,3 +1616,34 @@ export const clearRecentSearches = async (
     next(error);
   }
 };
+
+export const existingUsername = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { username } = req.params;
+
+    const trimmedUsername = username?.trim();
+
+    if (!trimmedUsername) {
+      res.status(400).json({
+        error: 'Username is required.',
+      });
+      return;
+    }
+
+    const existingUser = await User.findOne({
+      username: trimmedUsername,
+    })
+      .select('_id')
+      .lean();
+
+    res.status(200).json({
+      taken: !!existingUser,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

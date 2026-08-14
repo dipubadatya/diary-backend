@@ -19,13 +19,15 @@ import {
   searchWriters,
   addRecentSearch,
   removeRecentSearch,
-  clearRecentSearches
+  clearRecentSearches,
+  existingUsername
 } from '../controllers/users';
 
 const router = Router();
 const upload = multer({ storage });
 
 router.get('/search', optionalLoggedIn, searchWriters);
+router.get('/check-username/:username', existingUsername);
 router.post('/recent-searches', isLoggedIn, addRecentSearch);
 router.delete('/recent-searches/:id', isLoggedIn, removeRecentSearch);
 router.delete('/recent-searches', isLoggedIn, clearRecentSearches);
