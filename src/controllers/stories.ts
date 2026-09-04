@@ -721,13 +721,6 @@ export const searchGifs = async (
 ): Promise<void> => {
   try {
     const { q } = req.query;
-    if (!q) {
-      res.status(400).json({
-        success: false,
-        error: "Search query is required.",
-      });
-      return;
-    }
 
     const apiKey = process.env.GIPHY_API_KEY;
     if (!apiKey) {
@@ -745,6 +738,7 @@ export const searchGifs = async (
     );
 
     const data = (await response.json()) as any;
+        
 
     res.status(200).json({
       success: true,
