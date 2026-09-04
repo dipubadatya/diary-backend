@@ -14,11 +14,6 @@ export const createComment = async (req: Request, res: Response, next: NextFunct
       commentText = 'Attached GIF';
     }
 
-    if (!commentText || commentText.trim() === '') {
-       res.status(400).json({ error: 'Comment content cannot be empty.' });
-       return;
-    }
-
     const story = await Story.findById(storyId).populate('owner');
     if (!story) {
        res.status(404).json({ error: 'Story not found.' });
@@ -66,8 +61,10 @@ export const createComment = async (req: Request, res: Response, next: NextFunct
               $push: {
                 notifications: {
                   type: 'comment',
+                  targetType: 'story',
                   fromUser: userId,
                   storyId: story._id as any,
+                  storyTitle: story.title,
                   timeStamp: new Date(),
                   read: false
                 }
@@ -77,15 +74,20 @@ export const createComment = async (req: Request, res: Response, next: NextFunct
             if (io) {
               io.to(parentAuthorId.toString()).emit('newNotification', {
                 type: 'comment',
+                targetType: 'story',
                 fromUser: {
                   _id: userId,
                   username: (req.user as any).username,
+                  name: (req.user as any).name,
                   image: (req.user as any).image
                 },
                 storyId: {
                   _id: story._id,
                   title: story.title
-                }
+                },
+                storyTitle: story.title,
+                timeStamp: new Date(),
+                read: false
               });
             }
           } catch (err) {
@@ -111,8 +113,10 @@ export const createComment = async (req: Request, res: Response, next: NextFunct
           $push: {
             notifications: {
               type: 'comment',
+              targetType: 'story',
               fromUser: userId,
               storyId: story._id as any,
+              storyTitle: story.title,
               timeStamp: new Date(),
               read: false
             }
@@ -123,15 +127,20 @@ export const createComment = async (req: Request, res: Response, next: NextFunct
         if (io) {
           io.to(storyOwner._id.toString()).emit('newNotification', {
             type: 'comment',
+            targetType: 'story',
             fromUser: {
               _id: userId,
               username: (req.user as any).username,
+              name: (req.user as any).name,
               image: (req.user as any).image
             },
             storyId: {
               _id: story._id,
               title: story.title
-            }
+            },
+            storyTitle: story.title,
+            timeStamp: new Date(),
+            read: false
           });
         }
       } catch (err) {
@@ -219,11 +228,6 @@ export const updateComment = async (req: Request, res: Response, next: NextFunct
     const { comment } = req.body;
     const userId = (req.user as any)._id;
 
-    if (!comment || comment.trim() === '') {
-      res.status(400).json({ error: 'Comment content cannot be empty.' });
-      return;
-    }
-
     const existingComment = await Comment.findById(commentId);
     if (!existingComment) {
       res.status(404).json({ error: 'Comment not found.' });
@@ -302,8 +306,10 @@ export const likeComment = async (req: Request, res: Response, next: NextFunctio
           $push: {
             notifications: {
               type: 'like',
+              targetType: 'comment',
               fromUser: userId,
               storyId: story._id as any,
+              storyTitle: story.title,
               timeStamp: new Date(),
               read: false
             }
@@ -315,20 +321,37 @@ export const likeComment = async (req: Request, res: Response, next: NextFunctio
         if (io) {
           io.to(comment.author.toString()).emit('newNotification', {
             type: 'like',
+            targetType: 'comment',
             fromUser: {
               _id: userId,
               username: (req.user as any).username,
+              name: (req.user as any).name,
               image: (req.user as any).image
             },
             storyId: {
               _id: story._id,
               title: story.title
-            }
+            },
+            storyTitle: story.title,
+            timeStamp: new Date(),
+            read: false
           });
         }
       } catch (err) {
         console.error('Failed to send comment like notification:', err);
       }
+    } else if (!liked && comment.author.toString() !== userId.toString()) {
+      // Clean up like notification on unlike
+      User.findByIdAndUpdate(comment.author, {
+        $pull: {
+          notifications: {
+            type: 'like',
+            targetType: 'comment',
+            fromUser: userId,
+            storyId: story._id as any,
+          }
+        }
+      }).catch(err => console.error('Failed to remove comment like notification on unlike:', err));
     }
 
     // Emit socket event to sync likes

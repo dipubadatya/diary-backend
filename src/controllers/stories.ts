@@ -481,6 +481,23 @@ export const likeStory = async (
         { _id: id },
         { $pull: { likedBy: userId }, $inc: { likesCounts: -1 } },
       );
+
+      // Clean up like notification when unliking to prevent ghost notifications
+      const storyOwner = story.owner as any;
+      if (storyOwner && !storyOwner._id.equals(userId)) {
+        await User.updateOne(
+          { _id: storyOwner._id },
+          {
+            $pull: {
+              notifications: {
+                type: "like",
+                fromUser: userId,
+                storyId: story._id,
+              },
+            },
+          },
+        );
+      }
     } else {
       await Story.updateOne(
         { _id: id },
@@ -495,8 +512,10 @@ export const likeStory = async (
             $push: {
               notifications: {
                 type: "like",
+                targetType: "story",
                 fromUser: userId,
                 storyId: story._id,
+                storyTitle: story.title,
                 timeStamp: new Date(),
                 read: false,
               },
@@ -508,12 +527,17 @@ export const likeStory = async (
         if (io) {
           io.to(storyOwner._id.toString()).emit("newNotification", {
             type: "like",
+            targetType: "story",
             fromUser: {
               _id: userId,
               username: (req.user as any).username,
+              name: (req.user as any).name,
               image: (req.user as any).image,
             },
             storyId: { _id: story._id, title: story.title },
+            storyTitle: story.title,
+            timeStamp: new Date(),
+            read: false,
           });
         }
       }

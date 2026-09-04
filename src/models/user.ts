@@ -4,8 +4,10 @@ import bcrypt from 'bcryptjs';
 export interface INotification {
   _id?: mongoose.Types.ObjectId;
   type: 'like' | 'follow' | 'comment';
+  targetType?: 'story' | 'comment';
   fromUser: mongoose.Types.ObjectId;
   storyId?: mongoose.Types.ObjectId | null;
+  storyTitle?: string;
   timeStamp: Date;
   read: boolean;
 }
@@ -58,8 +60,14 @@ const notificationSchema = new Schema<INotification>({
     enum: ['like', 'follow', 'comment'],
     required: true
   },
+  targetType: {
+    type: String,
+    enum: ['story', 'comment'],
+    default: 'story'
+  },
   fromUser: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   storyId: { type: Schema.Types.ObjectId, ref: 'Story', default: null },
+  storyTitle: { type: String, default: '' },
   timeStamp: {
     type: Date,
     default: Date.now
@@ -84,7 +92,7 @@ const userSchema = new Schema<IUser>({
   },
   password: {
     type: String,
-    required: function(this: any) {
+    required: function (this: any) {
       return !this.provider || this.provider === 'local';
     }
   },
@@ -191,7 +199,7 @@ userSchema.methods.comparePassword = async function (candidatePassword: string):
 // Static method to cleanup old unverified users
 userSchema.statics.cleanupUnverifiedUsers = async function () {
   try {
-    const cutoff = new Date(Date.now() - 2 * 60 * 1000); // 2 minutes ago
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours ago
     const result = await this.deleteMany({
       isVerified: false,
       createdAt: { $lt: cutoff }

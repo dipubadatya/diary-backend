@@ -27,6 +27,8 @@ import {
   getNotifications,
   getUnreadNotificationsCount,
   deleteNotification,
+  markAllNotificationsAsRead,
+  clearAllNotifications,
   changePassword,
   deleteBannerImage,
   deleteAccount,
@@ -58,6 +60,8 @@ router.get('/following/:id', validate(getFollowingSchema), getFollowing);
 
 router.get('/notifications/unread-count', isLoggedIn, getUnreadNotificationsCount);
 router.get('/notifications', isLoggedIn, getNotifications);
+router.put('/notifications/mark-read', isLoggedIn, markAllNotificationsAsRead);
+router.delete('/notifications', isLoggedIn, clearAllNotifications);
 router.delete('/notifications/:notifId', isLoggedIn, validate(deleteNotificationSchema), deleteNotification);
 
 router.post('/change-password', isLoggedIn, validate(changePasswordSchema), changePassword);

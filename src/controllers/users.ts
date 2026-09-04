@@ -1,4 +1,3 @@
-
 import { Request, Response, NextFunction } from "express";
 import User from "../models/user";
 import Story from "../models/story";
@@ -13,9 +12,6 @@ import mongoose from "mongoose";
 
 const isValidObjectId = (id: string): boolean =>
   mongoose.Types.ObjectId.isValid(id);
-
-const sanitizeString = (str: string, maxLength: number): string =>
-  str?.toString().trim().slice(0, maxLength) || "";
 
 const escapeRegex = (string: string): string =>
   string.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
@@ -49,11 +45,6 @@ export const getUserProfile = async (
     const { username } = req.params;
     const currentUserId = req.user ? (req.user as any)._id : null;
 
-    if (!username || username.trim() === "") {
-      res.status(400).json({ error: "Username or ID is required." });
-      return;
-    }
-
     const query =
       isValidObjectId(username) && username.length === 24
         ? { _id: username }
@@ -61,7 +52,7 @@ export const getUserProfile = async (
 
     const user = await User.findOne(query).select(
       "-salt -hash -verificationToken -verificationTokenExpires " +
-        "-resetPasswordToken -resetPasswordExpires -__v",
+      "-resetPasswordToken -resetPasswordExpires -__v",
     );
 
     if (!user) {
@@ -100,14 +91,14 @@ export const getUserProfile = async (
 
     const isFollowing = currentUserId
       ? user.followers.some(
-          (fid: any) => fid.toString() === currentUserId.toString(),
-        )
+        (fid: any) => fid.toString() === currentUserId.toString(),
+      )
       : false;
 
     const followsMe = currentUserId
       ? user.following.some(
-          (fid: any) => fid.toString() === currentUserId.toString(),
-        )
+        (fid: any) => fid.toString() === currentUserId.toString(),
+      )
       : false;
 
     const isOwnProfile = currentUserId
@@ -149,31 +140,15 @@ export const updateProfile = async (
     const userId = (req.user as any)._id;
     const { name, username, bio } = req.body;
 
-    if (!name && !username && !bio) {
-      res.status(400).json({ error: "At least one field is required to update." });
-      return;
-    }
-
-    const sanitizedName = name ? sanitizeString(name, 50) : undefined;
-    const sanitizedUsername = username ? sanitizeString(username, 30) : undefined;
-    const sanitizedBio = bio !== undefined ? sanitizeString(bio, 300) : undefined;
-
-    if (sanitizedUsername && !/^[a-zA-Z0-9_]+$/.test(sanitizedUsername)) {
-      res.status(400).json({
-        error: "Username can only contain letters, numbers, and underscores.",
-      });
-      return;
-    }
-
     const user = await User.findById(userId);
     if (!user) {
       res.status(404).json({ error: "User not found." });
       return;
     }
 
-    if (sanitizedUsername && sanitizedUsername !== user.username) {
+    if (username && username !== user.username) {
       const usernameExists = await User.findOne({
-        username: sanitizedUsername,
+        username,
         _id: { $ne: userId },
       });
 
@@ -182,11 +157,11 @@ export const updateProfile = async (
         return;
       }
 
-      user.username = sanitizedUsername;
+      user.username = username;
     }
 
-    if (sanitizedName) user.name = sanitizedName;
-    if (sanitizedBio !== undefined) user.bio = sanitizedBio;
+    if (name) user.name = name;
+    if (bio !== undefined) user.bio = bio;
 
     await user.save();
 
@@ -233,7 +208,9 @@ export const updateProfileImage = async (
     if (oldPublicId) {
       cloudinary.uploader
         .destroy(oldPublicId)
-        .catch((err) => console.error("Failed to delete old profile image:", err));
+        .catch((err) =>
+          console.error("Failed to delete old profile image:", err),
+        );
     }
 
     res.status(200).json({
@@ -285,7 +262,9 @@ export const updateBannerImage = async (
     if (oldPublicId) {
       cloudinary.uploader
         .destroy(oldPublicId)
-        .catch((err) => console.error("Failed to delete old banner image:", err));
+        .catch((err) =>
+          console.error("Failed to delete old banner image:", err),
+        );
     }
 
     res.status(200).json({
@@ -331,7 +310,9 @@ export const deleteBannerImage = async (
 
     cloudinary.uploader
       .destroy(oldPublicId)
-      .catch((err) => console.error("Failed to destroy banner from Cloudinary:", err));
+      .catch((err) =>
+        console.error("Failed to destroy banner from Cloudinary:", err),
+      );
 
     res.status(200).json({
       success: true,
@@ -354,11 +335,6 @@ export const toggleFollow = async (
   try {
     const { id } = req.params;
     const currentUserId = (req.user as any)._id;
-
-    if (!isValidObjectId(id)) {
-      res.status(400).json({ error: "Invalid user ID." });
-      return;
-    }
 
     if (id === currentUserId.toString()) {
       res.status(400).json({ error: "You cannot follow yourself." });
@@ -426,6 +402,7 @@ export const toggleFollow = async (
             fromUser: {
               _id: currentUser._id,
               username: currentUser.username,
+              name: currentUser.name,
               image: currentUser.image,
             },
             timeStamp: new Date(),
@@ -445,7 +422,9 @@ export const toggleFollow = async (
       isFollowing: !alreadyFollowing,
       followersCount: updatedTarget?.followers?.length ?? 0,
       followingCount: updatedCurrent?.following?.length ?? 0,
-      message: alreadyFollowing ? "Unfollowed successfully." : "Followed successfully.",
+      message: alreadyFollowing
+        ? "Unfollowed successfully."
+        : "Followed successfully.",
     });
   } catch (error) {
     next(error);
@@ -459,11 +438,6 @@ export const getFollowers = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-
-    if (!isValidObjectId(id)) {
-      res.status(400).json({ error: "Invalid user ID." });
-      return;
-    }
 
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
@@ -507,11 +481,6 @@ export const getFollowing = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-
-    if (!isValidObjectId(id)) {
-      res.status(400).json({ error: "Invalid user ID." });
-      return;
-    }
 
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(50, parseInt(req.query.limit as string) || 20);
@@ -560,10 +529,15 @@ export const getNotifications = async (
   try {
     const userId = (req.user as any)._id;
 
-    const user = await User.findById(userId).populate({
-      path: "notifications.fromUser",
-      select: "username name image",
-    });
+    const user = await User.findById(userId)
+      .populate({
+        path: "notifications.fromUser",
+        select: "username name image avatar",
+      })
+      .populate({
+        path: "notifications.storyId",
+        select: "_id title",
+      });
 
     if (!user) {
       res.status(404).json({ error: "User not found." });
@@ -583,7 +557,9 @@ export const getNotifications = async (
         { _id: userId, "notifications.read": false },
         { $set: { "notifications.$[elem].read": true } },
         { arrayFilters: [{ "elem.read": false }] },
-      ).catch((err) => console.error("Failed to mark notifications as read:", err));
+      ).catch((err) =>
+        console.error("Failed to mark notifications as read:", err),
+      );
     }
 
     // Group notifications by date
@@ -648,15 +624,12 @@ export const deleteNotification = async (
     const userId = (req.user as any)._id;
     const { notifId } = req.params;
 
-    if (!isValidObjectId(notifId)) {
-      res.status(400).json({ error: "Invalid notification ID." });
-      return;
-    }
-
     // Pull the notification only if it belongs to this user
     const result = await User.findByIdAndUpdate(
       userId,
-      { $pull: { notifications: { _id: new mongoose.Types.ObjectId(notifId) } } },
+      {
+        $pull: { notifications: { _id: new mongoose.Types.ObjectId(notifId) } },
+      },
       { new: true },
     );
 
@@ -668,6 +641,57 @@ export const deleteNotification = async (
     res.status(200).json({
       success: true,
       message: "Notification deleted.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const markAllNotificationsAsRead = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const userId = (req.user as any)._id;
+
+    await User.updateOne(
+      { _id: userId, "notifications.read": false },
+      { $set: { "notifications.$[elem].read": true } },
+      { arrayFilters: [{ "elem.read": false }] },
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "All notifications marked as read.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const clearAllNotifications = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const userId = (req.user as any)._id;
+
+    const result = await User.findByIdAndUpdate(
+      userId,
+      { $set: { notifications: [] } },
+      { new: true },
+    );
+
+    if (!result) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "All notifications cleared.",
     });
   } catch (error) {
     next(error);
@@ -686,23 +710,6 @@ export const changePassword = async (
   try {
     const userId = (req.user as any)._id;
     const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      res.status(400).json({ error: "Current password and new password are required." });
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      res.status(400).json({ error: "New password must be at least 8 characters long." });
-      return;
-    }
-
-    if (currentPassword === newPassword) {
-      res.status(400).json({
-        error: "New password must be different from the current password.",
-      });
-      return;
-    }
 
     const user = await User.findById(userId);
     if (!user) {
@@ -730,6 +737,8 @@ export const changePassword = async (
   }
 };
 
+
+
 export const deleteAccount = async (
   req: Request,
   res: Response,
@@ -748,18 +757,51 @@ export const deleteAccount = async (
     const userStories = await Story.find({ owner: userId }).select("image");
 
     const cloudinaryIds: string[] = [];
-    if (user.image?.publicId) cloudinaryIds.push(user.image.publicId);
-    if (user.banner?.publicId) cloudinaryIds.push(user.banner.publicId);
+
+    if (user.image?.publicId) {
+      cloudinaryIds.push(user.image.publicId);
+    }
+
+    if (user.banner?.publicId) {
+      cloudinaryIds.push(user.banner.publicId);
+    }
+
     userStories.forEach((story: any) => {
-      if (story.image?.publicId) cloudinaryIds.push(story.image.publicId);
+      if (story.image?.publicId) {
+        cloudinaryIds.push(story.image.publicId);
+      }
     });
 
-    // Delete all user data from the database in parallel
+    // Delete all user data and clean up references
     await Promise.all([
+      // Delete stories owned by this user
       Story.deleteMany({ owner: userId }),
+
+      // Remove this user's likes from other users' stories
+      Story.updateMany(
+        { likedBy: userId },
+        {
+          $pull: { likedBy: userId },
+          $inc: { likesCounts: -1 },
+        },
+      ),
+
+      // Delete comments authored by this user
       Comment.deleteMany({ author: userId }),
-      User.updateMany({ followers: userId }, { $pull: { followers: userId } }),
-      User.updateMany({ following: userId }, { $pull: { following: userId } }),
+
+      // Remove this user from other users' followers
+      User.updateMany(
+        { followers: userId },
+        { $pull: { followers: userId } },
+      ),
+
+      // Remove this user from other users' following
+      User.updateMany(
+        { following: userId },
+        { $pull: { following: userId } },
+      ),
+
+      // Delete the user account
       User.findByIdAndDelete(userId),
     ]);
 
@@ -767,30 +809,32 @@ export const deleteAccount = async (
     if (cloudinaryIds.length > 0) {
       Promise.all(
         cloudinaryIds.map((pid) =>
-          cloudinary.uploader
-            .destroy(pid)
-            .catch((err) => console.error(`Cloudinary delete failed for ${pid}:`, err)),
+          cloudinary.uploader.destroy(pid).catch((err) => {
+            console.error(
+              `Cloudinary delete failed for ${pid}:`,
+              err,
+            );
+          }),
         ),
-      ).catch(() => {});
+      ).catch(() => { });
     }
 
-    // Log the user out and destroy their session
-    const expressReq = req as any;
-    expressReq.logout((err: any) => {
-      if (err) return next(err);
-      expressReq.session.destroy((destroyErr: any) => {
-        if (destroyErr) return next(destroyErr);
-        res.clearCookie("connect.sid");
-        res.status(200).json({
-          success: true,
-          message: "Account deleted successfully.",
-        });
-      });
+    res.clearCookie("token", {
+      httpOnly: true,
+      sameSite:
+        process.env.NODE_ENV === "production" ? "none" : "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Account deleted successfully.",
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 // ─────────────────────────────────────────────
 // SEARCH - SEARCH WRITERS, RECENT SEARCHES
@@ -823,14 +867,14 @@ export const searchWriters = async (
           .map((u: any) => {
             const isFollowing = currentUserId
               ? u.followers?.some(
-                  (fid: any) => fid.toString() === currentUserId.toString(),
-                )
+                (fid: any) => fid.toString() === currentUserId.toString(),
+              )
               : false;
 
             const followsMe = currentUserId
               ? u.following?.some(
-                  (fid: any) => fid.toString() === currentUserId.toString(),
-                )
+                (fid: any) => fid.toString() === currentUserId.toString(),
+              )
               : false;
 
             return {
@@ -869,7 +913,10 @@ export const searchWriters = async (
       let textScore = 0;
       if (lowerUsername === lowerQ || lowerName === lowerQ) {
         textScore = 1000; // Exact match
-      } else if (lowerUsername.startsWith(lowerQ) || lowerName.startsWith(lowerQ)) {
+      } else if (
+        lowerUsername.startsWith(lowerQ) ||
+        lowerName.startsWith(lowerQ)
+      ) {
         textScore = 500; // Starts with query
       } else {
         textScore = 100; // Partial match
@@ -934,11 +981,6 @@ export const addRecentSearch = async (
     const { writerId } = req.body;
     const currentUserId = (req.user as any)._id;
 
-    if (!writerId || !isValidObjectId(writerId)) {
-      res.status(400).json({ error: "Invalid writer ID." });
-      return;
-    }
-
     const writer = await User.findById(writerId);
     if (!writer) {
       res.status(404).json({ error: "Writer not found." });
@@ -980,11 +1022,6 @@ export const removeRecentSearch = async (
   try {
     const { id } = req.params;
     const currentUserId = (req.user as any)._id;
-
-    if (!id || !isValidObjectId(id)) {
-      res.status(400).json({ error: "Invalid writer ID." });
-      return;
-    }
 
     const user = await User.findById(currentUserId);
     if (!user) {
@@ -1039,16 +1076,8 @@ export const existingUsername = async (
 ): Promise<void> => {
   try {
     const { username } = req.params;
-    const trimmedUsername = username?.trim();
 
-    if (!trimmedUsername) {
-      res.status(400).json({ error: "Username is required." });
-      return;
-    }
-
-    const existingUser = await User.findOne({ username: trimmedUsername })
-      .select("_id")
-      .lean();
+    const existingUser = await User.findOne({ username }).select("_id").lean();
 
     res.status(200).json({ taken: !!existingUser });
   } catch (error) {
