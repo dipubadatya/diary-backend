@@ -160,3 +160,25 @@ export const searchWritersSchema = z.object({
 });
 
 export type SearchWritersInput = z.infer<typeof searchWritersSchema>;
+
+// ============================================
+// UPDATE WRITING GOALS SCHEMA
+// ============================================
+export const updateWritingGoalsSchema = z.object({
+  body: z.object({
+    dailyTarget: z
+      .number({ message: 'Daily target must be a number' })
+      .int('Daily target must be an integer')
+      .min(1, 'Daily target must be at least 1')
+      .max(50, 'Daily target cannot exceed 50'),
+    weeklyTarget: z
+      .number({ message: 'Weekly target must be a number' })
+      .int('Weekly target must be an integer')
+      .min(1, 'Weekly target must be at least 1')
+      .max(200, 'Weekly target cannot exceed 200'),
+    timezone: z.string().trim().optional()
+  })
+});
+
+export type UpdateWritingGoalsInput = z.infer<typeof updateWritingGoalsSchema>;
+

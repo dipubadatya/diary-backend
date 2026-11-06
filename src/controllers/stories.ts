@@ -4,6 +4,7 @@ import User from "../models/user";
 import { cloudinary } from "../config/cloudinary";
 import PDFDocument from "pdfkit";
 import axios from "axios";
+import { calculateUserStreakAndGoals } from "../services/streak.service";
 
 // ============================================
 // GET ALL STORIES
@@ -772,3 +773,151 @@ export const searchGifs = async (
     next(error);
   }
 };
+
+// ============================================
+// GET CALENDAR STORIES (Private personal feature)
+// ============================================
+export const getCalendarStories = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user || !(user as any)._id) {
+      res.status(401).json({
+        success: false,
+        error: "Please log in to continue.",
+      });
+      return;
+    }
+
+    const now = new Date();
+    const year = req.query.year
+      ? parseInt(req.query.year as string, 10)
+      : now.getFullYear();
+    const month = req.query.month
+      ? parseInt(req.query.month as string, 10)
+      : now.getMonth() + 1;
+    const timezone = (req.query.timezone as string) || undefined;
+
+    // Helper: format Date in the requested timezone as YYYY-MM-DD
+    const formatDateInTimezone = (date: Date, tz?: string): string => {
+      if (tz) {
+        try {
+          const formatter = new Intl.DateTimeFormat("en-CA", {
+            timeZone: tz,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          });
+          return formatter.format(date);
+        } catch {
+          // Fallback if timezone string is invalid
+        }
+      }
+      return date.toISOString().split("T")[0];
+    };
+
+    // Calculate a safe date range around the month (+/- 7 days buffer for timezones and grid edges)
+    const startOfMonth = new Date(Date.UTC(year, month - 1, 1));
+    const endOfMonth = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
+    const rangeStart = new Date(startOfMonth.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const rangeEnd = new Date(endOfMonth.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    // Fetch user stories, lifetime count, and streak/goals in parallel using compound index { owner: 1, timeStamp: -1 }
+    const [stories, totalUserStories, streakGoals] = await Promise.all([
+      Story.find({
+        owner: (user as any)._id,
+        timeStamp: { $gte: rangeStart, $lte: rangeEnd },
+      })
+        .sort({ timeStamp: 1 })
+        .select("_id title timeStamp")
+        .lean()
+        .exec(),
+      Story.countDocuments({ owner: (user as any)._id }),
+      calculateUserStreakAndGoals((user as any)._id, timezone),
+    ]);
+
+    // Group stories by date string in user's timezone
+    const groupedMap = new Map<
+      string,
+      Array<{ id: string; _id: string; title: string; createdAt: string }>
+    >();
+
+    for (const story of stories) {
+      const dateStr = formatDateInTimezone(new Date(story.timeStamp), timezone);
+      if (!groupedMap.has(dateStr)) {
+        groupedMap.set(dateStr, []);
+      }
+      groupedMap.get(dateStr)!.push({
+        id: story._id.toString(),
+        _id: story._id.toString(),
+        title: story.title,
+        createdAt: new Date(story.timeStamp).toISOString(),
+      });
+    }
+
+    const calendarData: Array<{
+      date: string;
+      entries: Array<{
+        id: string;
+        _id: string;
+        title: string;
+        createdAt: string;
+      }>;
+    }> = [];
+
+    for (const [date, entries] of groupedMap.entries()) {
+      calendarData.push({ date, entries });
+    }
+
+    res.status(200).json({
+      success: true,
+      year,
+      month,
+      totalUserStories,
+      data: calendarData,
+      streak: streakGoals.streak,
+      goals: streakGoals.goals,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ============================================
+// GET WRITING STREAK & GOALS
+// ============================================
+export const getStreakAndGoals = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user || !(user as any)._id) {
+      res.status(401).json({
+        success: false,
+        error: "Please log in to continue.",
+      });
+      return;
+    }
+
+    const timezone = (req.query.timezone as string) || undefined;
+    const stats = await calculateUserStreakAndGoals(
+      (user as any)._id,
+      timezone,
+    );
+
+    res.status(200).json({
+      success: true,
+      streak: stats.streak,
+      goals: stats.goals,
+      summary: stats.summary,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

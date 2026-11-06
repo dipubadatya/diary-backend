@@ -1,16 +1,4 @@
-import nodemailer from 'nodemailer';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TRANSPORTER
-// ─────────────────────────────────────────────────────────────────────────────
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+import { transporter } from "../config/mail";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONSTANTS
@@ -182,7 +170,7 @@ const buildLayout = ({
   card,
 }: {
   eyebrow: string;
-  title: string;        // supports <br/> for line breaks
+  title: string; // supports <br/> for line breaks
   card: string;
 }) => `
 <!DOCTYPE html>
@@ -230,27 +218,26 @@ const buildLayout = ({
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Personalised salutation */
-const Greeting = (name: string) =>
-  `<p class="greeting">Hi ${name},</p>`;
+const Greeting = (name: string) => `<p class="greeting">Hi ${name},</p>`;
 
 /** Standard body paragraph */
-const BodyText = (text: string) =>
-  `<p class="body-text">${text}</p>`;
+const BodyText = (text: string) => `<p class="body-text">${text}</p>`;
 
 /** Smaller muted note paragraph */
-const SmallText = (text: string) =>
-  `<p class="small-text">${text}</p>`;
+const SmallText = (text: string) => `<p class="small-text">${text}</p>`;
 
 /** Primary lime CTA button */
 const Button = (label: string, url: string) =>
   `<a href="${url}" class="btn">${label}</a>`;
 
 /** Horizontal rule */
-const Divider = () =>
-  `<hr class="divider"/>`;
+const Divider = () => `<hr class="divider"/>`;
 
 /** Monospace URL fallback block shown below every action button */
-const FallbackUrl = (url: string, label = "If the button doesn't work, copy and paste this link into your browser:") => `
+const FallbackUrl = (
+  url: string,
+  label = "If the button doesn't work, copy and paste this link into your browser:",
+) => `
   ${Divider()}
   <div class="fallback-wrap">
     <p class="fallback-label">${label}</p>
@@ -282,17 +269,17 @@ export const sendVerificationEmail = async (
   const card = `
     ${Greeting(username)}
     ${BodyText("We're glad you're here. Before you can start writing and sharing your stories, we just need to verify your email address to keep your account secure.")}
-    ${Button('Verify email address', url)}
+    ${Button("Verify email address", url)}
     ${FallbackUrl(url)}
   `;
 
   await transporter.sendMail({
     to: email,
     from: FROM,
-    subject: 'Verify your email for Diary',
+    subject: "Verify your email for Diary",
     html: buildLayout({
-      eyebrow: 'Account Setup',
-      title: 'Welcome to<br/>Diary',
+      eyebrow: "Account Setup",
+      title: "Welcome to<br/>Diary",
       card,
     }),
   });
@@ -316,7 +303,7 @@ export const sendResetPasswordEmail = async (
   const card = `
     ${Greeting(username)}
     ${BodyText("We received a request to reset the password for your Diary account. If you made this request, click the button below to set a new one. This link will expire in <strong>30 minutes</strong>.")}
-    ${Button('Set new password', url)}
+    ${Button("Set new password", url)}
     ${SmallText("If you didn't request this, you can safely ignore this email. Your password will remain exactly the same.")}
     ${FallbackUrl(url, "If the button doesn't work, copy and paste this link:")}
   `;
@@ -324,10 +311,10 @@ export const sendResetPasswordEmail = async (
   await transporter.sendMail({
     to: email,
     from: FROM,
-    subject: 'Reset your Diary password',
+    subject: "Reset your Diary password",
     html: buildLayout({
-      eyebrow: 'Security',
-      title: 'Reset your<br/>password',
+      eyebrow: "Security",
+      title: "Reset your<br/>password",
       card,
     }),
   });
@@ -349,7 +336,7 @@ export const sendPasswordConfirmationEmail = async (
   const card = `
     ${Greeting(username)}
     ${BodyText("Your password has been successfully updated. You can now use your new password to sign in to your Diary account and get back to writing.")}
-    ${Button('Go to sign in', url)}
+    ${Button("Go to sign in", url)}
     ${Divider()}
     <div class="fallback-wrap">
       <p class="fallback-label" style="margin-bottom:0;">
@@ -361,10 +348,10 @@ export const sendPasswordConfirmationEmail = async (
   await transporter.sendMail({
     to: email,
     from: FROM,
-    subject: 'Your Diary password was updated',
+    subject: "Your Diary password was updated",
     html: buildLayout({
-      eyebrow: 'Security Update',
-      title: 'Password<br/>updated',
+      eyebrow: "Security Update",
+      title: "Password<br/>updated",
       card,
     }),
   });

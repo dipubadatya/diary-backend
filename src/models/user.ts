@@ -13,6 +13,11 @@ export interface INotification {
 }
 
 
+export interface IWritingGoals {
+  dailyTarget: number;
+  weeklyTarget: number;
+}
+
 export interface IUser extends Document {
   name: string;
   username: string;
@@ -46,6 +51,7 @@ export interface IUser extends Document {
   verificationTokenExpires?: Date;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  writingGoals?: IWritingGoals;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -165,7 +171,21 @@ const userSchema = new Schema<IUser>({
   verificationToken: String,
   verificationTokenExpires: Date,
   resetPasswordToken: String,
-  resetPasswordExpires: Date
+  resetPasswordExpires: Date,
+  writingGoals: {
+    dailyTarget: {
+      type: Number,
+      default: 1,
+      min: 1,
+      max: 50
+    },
+    weeklyTarget: {
+      type: Number,
+      default: 5,
+      min: 1,
+      max: 200
+    }
+  }
 }, {
   timestamps: true
 });

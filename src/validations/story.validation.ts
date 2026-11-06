@@ -155,3 +155,37 @@ export const searchGifsSchema = z.object({
 });
 
 export type SearchGifsInput = z.infer<typeof searchGifsSchema>;
+
+// ============================================
+// GET CALENDAR STORIES SCHEMA
+// ============================================
+export const getCalendarStoriesSchema = z.object({
+  query: z.object({
+    year: z
+      .string()
+      .regex(/^\d{4}$/, 'Year must be a 4-digit number')
+      .optional(),
+    month: z
+      .string()
+      .regex(/^(0?[1-9]|1[0-2])$/, 'Month must be between 1 and 12')
+      .optional(),
+    timezone: z
+      .string()
+      .trim()
+      .optional()
+  })
+});
+
+export type GetCalendarStoriesInput = z.infer<typeof getCalendarStoriesSchema>;
+
+// ============================================
+// GET STREAK & GOALS SCHEMA
+// ============================================
+export const getStreakGoalsSchema = z.object({
+  query: z.object({
+    timezone: z.string().trim().optional()
+  })
+});
+
+export type GetStreakGoalsInput = z.infer<typeof getStreakGoalsSchema>;
+

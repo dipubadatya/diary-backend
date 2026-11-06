@@ -7,12 +7,6 @@ export const getMessages = async (req: Request, res: Response, next: NextFunctio
     const { receiverId } = req.params;
     const currentUserId = (req.user as any)._id;
 
-    // Validate ObjectId
-    if (!mongoose.Types.ObjectId.isValid(receiverId)) {
-       res.status(400).json({ error: 'Invalid receiver ID.' });
-       return;
-    }
-
     const receiverObjectId = new mongoose.Types.ObjectId(receiverId);
 
     // Fetch messages between sender and receiver

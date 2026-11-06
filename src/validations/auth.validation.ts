@@ -141,3 +141,23 @@ export const verifyEmailSchema = z.object({
 });
 
 export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+
+// ============================================
+// CHANGE EMAIL SCHEMA
+// ============================================
+export const changeEmailSchema = z.object({
+  body: z.object({
+    oldEmail: z
+      .string()
+      .trim()
+      .min(1, 'Old email is required')
+      .email('Invalid old email address'),
+    newEmail: z
+      .string()
+      .trim()
+      .min(1, 'New email is required')
+      .email('Invalid new email address')
+  })
+});
+
+export type ChangeEmailInput = z.infer<typeof changeEmailSchema>;

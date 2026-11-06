@@ -14,7 +14,8 @@ import {
   getFollowersSchema,
   getFollowingSchema,
   deleteNotificationSchema,
-  changePasswordSchema
+  changePasswordSchema,
+  updateWritingGoalsSchema
 } from '../validations/user.validation';
 import {
   getUserProfile,
@@ -36,7 +37,9 @@ import {
   addRecentSearch,
   removeRecentSearch,
   clearRecentSearches,
-  existingUsername
+  existingUsername,
+  getWritingGoals,
+  updateWritingGoals
 } from '../controllers/users';
 
 const router = Router();
@@ -53,6 +56,9 @@ router.put('/profile', isLoggedIn, validate(updateProfileSchema), updateProfile)
 router.put('/profile/image', isLoggedIn, upload.single('image'), updateProfileImage);
 router.put('/profile/banner', isLoggedIn, upload.single('image'), updateBannerImage);
 router.delete('/profile/banner', isLoggedIn, deleteBannerImage);
+
+router.get('/writing-goals', isLoggedIn, getWritingGoals);
+router.put('/writing-goals', isLoggedIn, validate(updateWritingGoalsSchema), updateWritingGoals);
 
 router.post('/follow/:id', isLoggedIn, validate(toggleFollowSchema), toggleFollow);
 router.get('/followers/:id', validate(getFollowersSchema), getFollowers);

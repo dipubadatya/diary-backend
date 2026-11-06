@@ -97,6 +97,7 @@ export const createComment = async (req: Request, res: Response, next: NextFunct
       }
     }
 
+
     // Scenario B: Main comment notifications (or notifying owner about reply if they aren't the parent author)
     // Avoid double notification if the story owner is the parent author (already notified in Scenario A)
     let isOwnerParentAuthor = false;

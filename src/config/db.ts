@@ -7,10 +7,10 @@ export const connectDB = async (): Promise<void> => {
       throw new Error('MONGO_ATLAS environment variable is not defined');
     }
     await mongoose.connect(dbUrl);
-    console.log('✅ MongoDB connected');
+    console.log('[DB] MongoDB connected');
 
   } catch (err) {
-    console.error('❌ MongoDB connection error:', err);
+    console.error('[DB] MongoDB connection error:', err);
     process.exit(1);
   }
 };

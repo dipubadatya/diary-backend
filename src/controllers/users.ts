@@ -5,6 +5,7 @@ import Comment from "../models/comment";
 import { cloudinary } from "../config/cloudinary";
 import moment from "moment";
 import mongoose from "mongoose";
+import { calculateUserStreakAndGoals } from "../services/streak.service";
 
 // ─────────────────────────────────────────────
 // HELPER FUNCTIONS
@@ -1084,3 +1085,68 @@ export const existingUsername = async (
     next(error);
   }
 };
+
+// ─────────────────────────────────────────────
+// WRITING GOALS - GET AND UPDATE TARGETS
+// ─────────────────────────────────────────────
+
+export const getWritingGoals = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const userId = (req.user as any)._id;
+    const timezone = (req.query.timezone as string) || undefined;
+    const stats = await calculateUserStreakAndGoals(userId, timezone);
+
+    res.status(200).json({
+      success: true,
+      goals: stats.goals,
+      streak: stats.streak,
+      summary: stats.summary,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateWritingGoals = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const userId = (req.user as any)._id;
+    const { dailyTarget, weeklyTarget } = req.body;
+    const timezone =
+      (req.query.timezone as string) ||
+      (req.body.timezone as string) ||
+      undefined;
+
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ success: false, error: "User not found." });
+      return;
+    }
+
+    user.writingGoals = {
+      dailyTarget: Math.max(1, parseInt(dailyTarget, 10) || 1),
+      weeklyTarget: Math.max(1, parseInt(weeklyTarget, 10) || 5),
+    };
+    await user.save();
+
+    const stats = await calculateUserStreakAndGoals(userId, timezone);
+
+    res.status(200).json({
+      success: true,
+      message: "Writing goals updated successfully.",
+      goals: stats.goals,
+      streak: stats.streak,
+      summary: stats.summary,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

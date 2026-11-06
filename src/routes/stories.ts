@@ -12,7 +12,9 @@ import {
   likeStorySchema,
   getLikedBySchema,
   downloadStoryPDFSchema,
-  searchGifsSchema
+  searchGifsSchema,
+  getCalendarStoriesSchema,
+  getStreakGoalsSchema
 } from '../validations/story.validation';
 
 import {
@@ -24,12 +26,16 @@ import {
   likeStory,
   getLikedBy,
   downloadStoryPDF,
-  searchGifs
+  searchGifs,
+  getCalendarStories,
+  getStreakAndGoals
 } from '../controllers/stories';
 
 const router = Router();
 const upload = multer({ storage });
 
+router.get('/calendar', isLoggedIn, validate(getCalendarStoriesSchema), getCalendarStories);
+router.get('/streak-goals', isLoggedIn, validate(getStreakGoalsSchema), getStreakAndGoals);
 router.get('/search-gif', isLoggedIn, validate(searchGifsSchema), searchGifs);
 router.get('/', validate(getStoriesSchema), getStories);
 router.post('/', isLoggedIn, upload.single('image'), validate(createStorySchema), createStory);

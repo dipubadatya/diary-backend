@@ -37,14 +37,13 @@ app.set('io', io);
 // Note: We will implement this TS file later in Phase 3/4.
 // For now, we will create a placeholder socket configuration.
 io.on('connection', (socket) => {
-  console.log('🔌 Client connected:', socket.id);
+  console.log('Client connected:', socket.id);
   socket.on('disconnect', () => {
-    console.log('🔌 Client disconnected:', socket.id);
+    console.log('Client disconnected:', socket.id);
   });
 });
 
-// Connect to Database
-connectDB();
+
 
 // --------------------
 // Middlewares
@@ -101,7 +100,7 @@ app.use('/api/*', (_req: Request, res: Response) => {
 // Error Handler
 // --------------------
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('❌ Server Error:', err);
+  console.error('[SERVER] Server Error:', err);
   res.status(err.status || err.http_code || 500).json({
     error: err.message || 'Internal Server Error',
     name: err.name || 'Error'
@@ -109,9 +108,20 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
 
+const startServer = async (): Promise<void> => { 
+  try {
+    await connectDB();
+
+    server.listen(PORT, () => {
+      console.log(`[SERVER] Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('[SERVER] Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
 export { app, server };
 // Server auto-reload trigger comment

@@ -12,7 +12,13 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'diary_web',
-    allowed_formats: ['png', 'jpg', 'jpeg'], // Note: allowed_formats is the correct parameter name in newer versions of multer-storage-cloudinary
+    allowed_formats: ['png', 'jpg', 'jpeg', 'gif'],
+    transformation: [
+      {
+        quality: 'auto',  
+        fetch_format: 'auto', 
+      },
+    ], 
   } as any,
 });
 

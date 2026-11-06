@@ -3,6 +3,7 @@ import {
   signup,
   verifyEmail,
   resendVerification,
+  changeEmail,
   login,
   logout,
   checkAuth,
@@ -15,6 +16,7 @@ import {
   signupSchema,
   verifyEmailSchema,
   resendVerificationSchema,
+  changeEmailSchema,
   loginSchema,
   googleLoginSchema,
   forgotPasswordSchema,
@@ -26,6 +28,7 @@ const router = Router();
 router.post('/signup', validate(signupSchema), signup);
 router.get('/verify-email', validate(verifyEmailSchema), verifyEmail);
 router.post('/resend-verification', validate(resendVerificationSchema), resendVerification);
+router.post('/change-email', validate(changeEmailSchema), changeEmail);
 router.post('/login', validate(loginSchema), login);
 router.post('/google', validate(googleLoginSchema), googleLogin);
 router.get('/logout', logout); // Supports GET for ease of use (like original EJS app)
