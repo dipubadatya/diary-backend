@@ -39,7 +39,8 @@ import {
   clearRecentSearches,
   existingUsername,
   getWritingGoals,
-  updateWritingGoals
+  updateWritingGoals,
+  getUserLikedStories
 } from '../controllers/users';
 
 const router = Router();
@@ -51,6 +52,7 @@ router.post('/recent-searches', isLoggedIn, validate(addRecentSearchSchema), add
 router.delete('/recent-searches/:id', isLoggedIn, validate(removeRecentSearchSchema), removeRecentSearch);
 router.delete('/recent-searches', isLoggedIn, clearRecentSearches);
 
+router.get('/profile/:username/liked', isLoggedIn, validate(getUserProfileSchema), getUserLikedStories);
 router.get('/profile/:username', optionalLoggedIn, validate(getUserProfileSchema), getUserProfile);
 router.put('/profile', isLoggedIn, validate(updateProfileSchema), updateProfile);
 router.put('/profile/image', isLoggedIn, upload.single('image'), updateProfileImage);

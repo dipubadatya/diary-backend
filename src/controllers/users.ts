@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import User from "../models/user";
 import Story from "../models/story";
 import Comment from "../models/comment";
+import Message from "../models/message";
 import { cloudinary } from "../config/cloudinary";
 import moment from "moment";
 import mongoose from "mongoose";
@@ -65,7 +66,7 @@ export const getUserProfile = async (
     const limit = Math.min(20, parseInt(req.query.limit as string) || 10);
     const skip = (page - 1) * limit;
 
-    const [stats, stories, totalStories] = await Promise.all([
+    const [stats, stories, totalStories, totalLikedStories] = await Promise.all([
       Story.aggregate([
         { $match: { owner: user._id } },
         {
@@ -85,6 +86,7 @@ export const getUserProfile = async (
         .populate("owner", "username name image")
         .lean(),
       Story.countDocuments({ owner: user._id }),
+      Story.countDocuments({ likedBy: user._id }),
     ]);
 
     const userStats =
@@ -123,6 +125,7 @@ export const getUserProfile = async (
       stats: {
         totalStories: userStats.totalStories ?? 0,
         totalViews: userStats.totalViews ?? 0,
+        ...(isOwnProfile ? { likedStoriesCount: totalLikedStories ?? 0 } : {}),
       },
       isFollowing,
       followsMe,
@@ -754,16 +757,25 @@ export const deleteAccount = async (
       return;
     }
 
-    // Collect story images for Cloudinary cleanup
-    const userStories = await Story.find({ owner: userId }).select("image");
+    // 1. Gather all stories owned by this user
+    const userStories = await Story.find({ owner: userId }).select("_id image comments");
+    const userStoryIds = userStories.map((s) => s._id);
 
+    // 2. Gather all comments on the user's stories (to delete them completely)
+    const commentsOnUserStories = userStories.flatMap((s) => s.comments || []);
+
+    // 3. Gather comments authored by this user on other stories (to pull references from those stories)
+    const userAuthoredComments = await Comment.find({ author: userId }).select("_id");
+    const userAuthoredCommentIds = userAuthoredComments.map((c) => c._id);
+
+    // 4. Collect Cloudinary public IDs for media cleanup
     const cloudinaryIds: string[] = [];
 
-    if (user.image?.publicId) {
+    if (user.image?.publicId && user.image.publicId !== "profile_image") {
       cloudinaryIds.push(user.image.publicId);
     }
 
-    if (user.banner?.publicId) {
+    if (user.banner?.publicId && user.banner.publicId !== "profile_image") {
       cloudinaryIds.push(user.banner.publicId);
     }
 
@@ -773,12 +785,33 @@ export const deleteAccount = async (
       }
     });
 
-    // Delete all user data and clean up references
+    // 5. Execute complete database cleanup safely in parallel
     await Promise.all([
-      // Delete stories owned by this user
+      // A. Delete stories owned by this user
       Story.deleteMany({ owner: userId }),
 
-      // Remove this user's likes from other users' stories
+      // B. Delete comments on user's deleted stories
+      Comment.deleteMany({ _id: { $in: commentsOnUserStories } }),
+
+      // C. Remove user's authored comments from other stories' comments array
+      Story.updateMany(
+        { comments: { $in: userAuthoredCommentIds } },
+        { $pull: { comments: { $in: userAuthoredCommentIds } } },
+      ),
+
+      // D. Delete comments authored by this user
+      Comment.deleteMany({ author: userId }),
+
+      // E. Remove user's likes on comments
+      Comment.updateMany(
+        { likes: userId },
+        {
+          $pull: { likes: userId },
+          $inc: { likesCount: -1 },
+        },
+      ),
+
+      // F. Remove user's likes from other users' stories
       Story.updateMany(
         { likedBy: userId },
         {
@@ -787,26 +820,55 @@ export const deleteAccount = async (
         },
       ),
 
-      // Delete comments authored by this user
-      Comment.deleteMany({ author: userId }),
+      // G. Remove user from story views
+      Story.updateMany(
+        { views: userId },
+        { $pull: { views: userId } },
+      ),
 
-      // Remove this user from other users' followers
+      // H. Clean up notifications in other users' accounts (sent by user or referencing deleted stories)
+      User.updateMany(
+        {},
+        {
+          $pull: {
+            notifications: {
+              $or: [
+                { fromUser: userId },
+                { storyId: { $in: userStoryIds } },
+              ],
+            },
+          },
+        },
+      ),
+
+      // I. Remove this user from other users' followers
       User.updateMany(
         { followers: userId },
         { $pull: { followers: userId } },
       ),
 
-      // Remove this user from other users' following
+      // J. Remove this user from other users' following
       User.updateMany(
         { following: userId },
         { $pull: { following: userId } },
       ),
 
-      // Delete the user account
+      // K. Remove this user from other users' recent searches
+      User.updateMany(
+        { recentSearches: userId },
+        { $pull: { recentSearches: userId } },
+      ),
+
+      // L. Delete all chat data (sent or received messages)
+      Message.deleteMany({
+        $or: [{ sender: userId }, { receiver: userId }],
+      }),
+
+      // M. Finally, delete the user account
       User.findByIdAndDelete(userId),
     ]);
 
-    // Remove all Cloudinary assets after DB cleanup
+    // 6. Remove all Cloudinary assets after DB cleanup
     if (cloudinaryIds.length > 0) {
       Promise.all(
         cloudinaryIds.map((pid) =>
@@ -829,7 +891,69 @@ export const deleteAccount = async (
 
     res.status(200).json({
       success: true,
-      message: "Account deleted successfully.",
+      message: "Account and associated data deleted successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────
+// LIKED STORIES - GET USER'S LIKED STORIES
+// ─────────────────────────────────────────────
+
+export const getUserLikedStories = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { username } = req.params;
+
+    const query =
+      isValidObjectId(username) && username.length === 24
+        ? { _id: username }
+        : { username: username.trim() };
+
+    const targetUser = await User.findOne(query).select("_id username");
+    if (!targetUser) {
+      res.status(404).json({ success: false, error: "User not found." });
+      return;
+    }
+
+    const currentUserId = req.user ? (req.user as any)._id : null;
+    if (!currentUserId || currentUserId.toString() !== targetUser._id.toString()) {
+      res.status(403).json({
+        success: false,
+        error: "Liked stories are private and visible only to the profile owner.",
+      });
+      return;
+    }
+
+    const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+    const limit = Math.min(50, parseInt(req.query.limit as string, 10) || 20);
+    const skip = (page - 1) * limit;
+
+    const [stories, totalStories] = await Promise.all([
+      Story.find({ likedBy: targetUser._id })
+        .sort({ timeStamp: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("owner", "username name image")
+        .lean(),
+      Story.countDocuments({ likedBy: targetUser._id }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      stories,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.ceil(totalStories / limit),
+        totalStories,
+        hasNextPage: page * limit < totalStories,
+        hasPrevPage: page > 1,
+      },
     });
   } catch (error) {
     next(error);
