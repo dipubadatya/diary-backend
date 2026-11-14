@@ -84,12 +84,14 @@ import storiesRoutes from './routes/stories';
 import commentsRoutes from './routes/comments';
 import usersRoutes from './routes/users';
 import chatRoutes from './routes/chat';
+import ttsRoutes from './routes/tts';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/stories', storiesRoutes);
 app.use('/api/stories/:storyId/comments', commentsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/tts', ttsRoutes);
 
 // Catch-all API 404
 app.use('/api/*', (_req: Request, res: Response) => {
